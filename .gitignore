@@ -1,0 +1,7 @@
+.venv
+build
+dist
+account_saver_big_borderless.py
+test.py
+*.db
+*.spec
