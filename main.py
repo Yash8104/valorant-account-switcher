@@ -151,19 +151,20 @@ class App(tk.Tk):
         style.configure("InputLabel.TLabel", background=self.colors["card"], foreground=self.colors["text"], font=base_font)
         style.configure("Status.TLabel", background=self.colors["card"], foreground=self.colors["muted"], font=base_font)
 
+        # Buttons: subtle corners come from ttk theme; keep low padding for tighter feel
         style.configure("TButton", background=self.colors["stroke"], foreground=self.colors["text"],
-                        padding=(10, 8), relief="flat")
+                        padding=(8, 6), relief="flat")
         style.map("TButton",
-                  background=[("active", self.colors["accent"])],
-                  foreground=[("active", "white")])
-        style.configure("Accent.TButton", background=self.colors["accent"], foreground="white", padding=(12, 10))
+                  background=[("active", self.colors["accent_alt"]), ("disabled", self.colors["stroke"])],
+                  foreground=[("active", "white"), ("disabled", self.colors["muted"])])
+        style.configure("Accent.TButton", background=self.colors["accent"], foreground="white", padding=(10, 8))
         style.map("Accent.TButton",
-                  background=[("active", "#9476ff")],
-                  foreground=[("active", "white")])
-        style.configure("Danger.TButton", background=self.colors["accent_alt"], foreground="white", padding=(12, 10))
+                  background=[("active", "#ff6f7a"), ("disabled", self.colors["stroke"])],
+                  foreground=[("active", "white"), ("disabled", self.colors["muted"])])
+        style.configure("Danger.TButton", background="#d95f70", foreground="white", padding=(10, 8))
         style.map("Danger.TButton",
-                  background=[("active", "#ff8b8b")],
-                  foreground=[("active", "white")])
+                  background=[("active", "#e27886"), ("disabled", self.colors["stroke"])],
+                  foreground=[("active", "white"), ("disabled", self.colors["muted"])])
 
         style.configure("TCheckbutton", background=self.colors["card"], foreground=self.colors["text"])
         style.configure("TEntry", fieldbackground=self.colors["card"], foreground=self.colors["text"],
@@ -185,7 +186,7 @@ class App(tk.Tk):
 
         # Content area
         content = ttk.Frame(self, style="Main.TFrame")
-        content.pack(fill="both", expand=True, padx=14, pady=14)
+        content.pack(fill="both", expand=True, padx=12, pady=12)
         content.columnconfigure(0, weight=1, minsize=340)
         content.columnconfigure(1, weight=1)
         content.rowconfigure(0, weight=1)
@@ -196,21 +197,21 @@ class App(tk.Tk):
         left.columnconfigure(0, weight=1)
         ttk.Label(left, text="Your Accounts", style="Header.TLabel").grid(row=0, column=0, sticky="w")
         search_row = ttk.Frame(left, style="Card.TFrame")
-        search_row.grid(row=1, column=0, sticky="ew", pady=(8, 6))
+        search_row.grid(row=1, column=0, sticky="ew", pady=(6, 4))
         ttk.Label(search_row, text="Search:", style="InputLabel.TLabel").pack(side="left", padx=(0, 6))
         self.search_var = tk.StringVar()
         search_entry = ttk.Entry(search_row, textvariable=self.search_var, width=24)
         search_entry.pack(side="left", fill="x", expand=True)
         search_entry.bind("<KeyRelease>", lambda _e: self._refresh_list())
         list_wrap = ttk.Frame(left, style="Card.TFrame")
-        list_wrap.grid(row=2, column=0, sticky="nsew", pady=(6, 6))
+        list_wrap.grid(row=2, column=0, sticky="nsew", pady=(4, 4))
         left.rowconfigure(2, weight=1)
 
         scrollbar = ttk.Scrollbar(list_wrap, orient="vertical", style="Vertical.TScrollbar")
         self.listbox = tk.Listbox(
             list_wrap, width=30, bg=self.colors["card"], fg=self.colors["text"],
-            selectbackground=self.colors["accent"], selectforeground="white",
-            relief="flat", highlightthickness=1, highlightcolor=self.colors["stroke"],
+            selectbackground=self.colors["stroke"], selectforeground=self.colors["text"],
+            relief="flat", highlightthickness=1, highlightcolor=self.colors["accent_alt"],
             highlightbackground=self.colors["stroke"], borderwidth=0,
             font=("JetBrainsMono Nerd Font", 12), yscrollcommand=scrollbar.set
         )
@@ -229,30 +230,30 @@ class App(tk.Tk):
             right.columnconfigure(c, weight=1)
 
         ttk.Label(right, text="Add / Edit Account", style="Header.TLabel")\
-            .grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 12))
+            .grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
-        ttk.Label(right, text="Nickname:", style="InputLabel.TLabel").grid(row=1, column=0, sticky="w", padx=4, pady=6)
+        ttk.Label(right, text="Nickname:", style="InputLabel.TLabel").grid(row=1, column=0, sticky="w", padx=4, pady=5)
         self.nickname_var = tk.StringVar()
         ttk.Entry(right, textvariable=self.nickname_var, width=40).grid(row=1, column=1, columnspan=2, sticky="ew")
 
-        ttk.Label(right, text="Username:", style="InputLabel.TLabel").grid(row=2, column=0, sticky="w", padx=4, pady=6)
+        ttk.Label(right, text="Username:", style="InputLabel.TLabel").grid(row=2, column=0, sticky="w", padx=4, pady=5)
         self.username_var = tk.StringVar()
         ttk.Entry(right, textvariable=self.username_var, width=40).grid(row=2, column=1, columnspan=2, sticky="ew")
 
-        ttk.Label(right, text="Password:", style="InputLabel.TLabel").grid(row=3, column=0, sticky="w", padx=4, pady=6)
+        ttk.Label(right, text="Password:", style="InputLabel.TLabel").grid(row=3, column=0, sticky="w", padx=4, pady=5)
         self.password_var = tk.StringVar()
         self.password_entry = ttk.Entry(right, textvariable=self.password_var, width=40, show="*")
         self.password_entry.grid(row=3, column=1, columnspan=2, sticky="ew")
 
         self.show_pw = tk.BooleanVar(value=False)
         ttk.Checkbutton(right, text="Show password", variable=self.show_pw,
-                        command=self._toggle_pw).grid(row=4, column=1, sticky="w", pady=(0, 10))
+                        command=self._toggle_pw).grid(row=4, column=1, sticky="w", pady=(0, 8))
 
         self.editing_label = ttk.Label(right, text="", style="Muted.TLabel")
-        self.editing_label.grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 6))
+        self.editing_label.grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 4))
 
         btns = ttk.Frame(right, style="Card.TFrame")
-        btns.grid(row=6, column=0, columnspan=3, pady=10, sticky="ew")
+        btns.grid(row=6, column=0, columnspan=3, pady=8, sticky="ew")
         for c in range(3):
             btns.columnconfigure(c, weight=1)
         self.add_btn = ttk.Button(btns, text="Add", command=self.add_account, style="Accent.TButton")
@@ -494,7 +495,7 @@ class App(tk.Tk):
         top.protocol("WM_DELETE_WINDOW", on_close)
 
         # toast label
-        toast_lbl = ttk.Label(container, text="", foreground="green", background=self.colors["panel"])
+        toast_lbl = ttk.Label(container, text="", foreground=self.colors["accent"], background=self.colors["panel"])
         toast_lbl.pack_forget()
         def toast(msg):
             toast_lbl.config(text=msg)
@@ -623,7 +624,7 @@ class App(tk.Tk):
 
         btn_row = ttk.Frame(container, style="Card.TFrame")
         btn_row.pack(fill="x", padx=8, pady=(10, 6))
-        ttk.Button(btn_row, text="Auto-fill Username + Password", command=autofocus_and_autofill)\
+        ttk.Button(btn_row, text="Auto-fill Username + Password", command=autofocus_and_autofill, style="Accent.TButton")\
             .pack(side="left")
 
         ttk.Label(container, text="Tip: If it can't focus Riot automatically, it will give you 2s to click it.",
