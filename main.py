@@ -102,6 +102,8 @@ class App(tk.Tk):
         self.db = SimpleDB()
         self.current_id = None
         self.rows = []
+        self.all_rows = []
+        self.status_after_id = None
 
         self._build_ui()
         self._refresh_list()
@@ -118,136 +120,205 @@ class App(tk.Tk):
             self.icon_image = None
 
     def _setup_style(self):
-        # Red-accent dark palette
+        # Soft dusk palette
         self.colors = {
-            "bg": "#1a0d0f",
-            "panel": "#210f13",
-            "accent": "#ff2d44",
-            "text": "#f5e9ea",
-            "muted": "#c48c94"
+            "bg": "#0f141f",
+            "panel": "#151b29",
+            "card": "#1e2636",
+            "accent": "#f04452",
+            "accent_alt": "#7c9bff",
+            "text": "#eef2f8",
+            "muted": "#a8b4c8",
+            "stroke": "#2d3850"
         }
         self.configure(bg=self.colors["bg"])
-        base_font = tkfont.Font(family="JetBrainsMono Nerd Font", size=10, weight="normal")
-        header_font = tkfont.Font(family="JetBrainsMono Nerd Font", size=12, weight="bold")
+        base_font = tkfont.Font(family="JetBrainsMono Nerd Font", size=12, weight="normal")
+        header_font = tkfont.Font(family="JetBrainsMono Nerd Font", size=16, weight="bold")
+        hero_font = tkfont.Font(family="JetBrainsMono Nerd Font", size=18, weight="bold")
         self.option_add("*Font", base_font)
 
         style = ttk.Style(self)
         style.theme_use("clam")
         style.configure("TFrame", background=self.colors["panel"])
         style.configure("Main.TFrame", background=self.colors["panel"])
-        style.configure("Side.TFrame", background=self.colors["panel"])
+        style.configure("Side.TFrame", background=self.colors["card"])
+        style.configure("Card.TFrame", background=self.colors["card"])
         style.configure("TLabel", background=self.colors["panel"], foreground=self.colors["text"], font=base_font)
         style.configure("Header.TLabel", background=self.colors["panel"], foreground=self.colors["text"],
                         font=header_font)
+        style.configure("Hero.TLabel", background=self.colors["panel"], foreground=self.colors["accent"], font=hero_font)
         style.configure("Muted.TLabel", background=self.colors["panel"], foreground=self.colors["muted"], font=base_font)
-        style.configure("TButton", background=self.colors["panel"], foreground=self.colors["text"], padding=6)
+        style.configure("InputLabel.TLabel", background=self.colors["card"], foreground=self.colors["text"], font=base_font)
+        style.configure("Status.TLabel", background=self.colors["card"], foreground=self.colors["muted"], font=base_font)
+
+        style.configure("TButton", background=self.colors["stroke"], foreground=self.colors["text"],
+                        padding=(10, 8), relief="flat")
         style.map("TButton",
                   background=[("active", self.colors["accent"])],
                   foreground=[("active", "white")])
-        style.configure("Accent.TButton", background=self.colors["accent"], foreground="white", padding=8)
+        style.configure("Accent.TButton", background=self.colors["accent"], foreground="white", padding=(12, 10))
         style.map("Accent.TButton",
-                  background=[("active", "#ff6977")],
+                  background=[("active", "#9476ff")],
                   foreground=[("active", "white")])
-        style.configure("TCheckbutton", background=self.colors["panel"], foreground=self.colors["text"])
-        style.configure("TEntry", fieldbackground=self.colors["bg"], foreground=self.colors["text"],
-                        bordercolor=self.colors["bg"])
-        style.configure("ReadOnly.TEntry", fieldbackground=self.colors["bg"], foreground=self.colors["text"],
-                        bordercolor=self.colors["bg"])
+        style.configure("Danger.TButton", background=self.colors["accent_alt"], foreground="white", padding=(12, 10))
+        style.map("Danger.TButton",
+                  background=[("active", "#ff8b8b")],
+                  foreground=[("active", "white")])
+
+        style.configure("TCheckbutton", background=self.colors["card"], foreground=self.colors["text"])
+        style.configure("TEntry", fieldbackground=self.colors["card"], foreground=self.colors["text"],
+                        bordercolor=self.colors["stroke"])
+        style.configure("ReadOnly.TEntry", fieldbackground=self.colors["card"], foreground=self.colors["text"],
+                        bordercolor=self.colors["stroke"])
         style.map("ReadOnly.TEntry",
-                  fieldbackground=[("readonly", self.colors["bg"])],
+                  fieldbackground=[("readonly", self.colors["card"])],
                   foreground=[("readonly", self.colors["text"])],
-                  bordercolor=[("readonly", self.colors["bg"])])
+                  bordercolor=[("readonly", self.colors["stroke"])])
 
     def _build_ui(self):
-        main = ttk.Frame(self, style="Main.TFrame")
-        main.pack(fill="both", expand=True, padx=16, pady=16)
-        main.columnconfigure(0, weight=1, minsize=260)
-        main.columnconfigure(1, weight=2)
-        main.rowconfigure(0, weight=1)
+        # Header
+        header = ttk.Frame(self, style="Main.TFrame", padding=(12, 12))
+        header.pack(fill="x", padx=14, pady=(10, 0))
+        ttk.Label(header, text="VALORANT Account Switcher", style="Hero.TLabel").pack(anchor="w")
+        ttk.Label(header, text="Manage and switch between your VALORANT accounts", style="Muted.TLabel")\
+            .pack(anchor="w", pady=(2, 0))
 
-        # Left pane: list with scrollbar
-        left = ttk.Frame(main, style="Side.TFrame")
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 14), pady=6)
-        ttk.Label(left, text="Accounts", style="Header.TLabel").pack(anchor="w", pady=(0, 10))
-        list_wrap = ttk.Frame(left, style="Side.TFrame")
-        list_wrap.pack(fill="both", expand=True)
-        scrollbar = ttk.Scrollbar(list_wrap, orient="vertical")
+        # Content area
+        content = ttk.Frame(self, style="Main.TFrame")
+        content.pack(fill="both", expand=True, padx=14, pady=14)
+        content.columnconfigure(0, weight=1, minsize=340)
+        content.columnconfigure(1, weight=1)
+        content.rowconfigure(0, weight=1)
+
+        # Left card: accounts list
+        left = ttk.Frame(content, style="Card.TFrame", padding=14)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=6)
+        left.columnconfigure(0, weight=1)
+        ttk.Label(left, text="Your Accounts", style="Header.TLabel").grid(row=0, column=0, sticky="w")
+        search_row = ttk.Frame(left, style="Card.TFrame")
+        search_row.grid(row=1, column=0, sticky="ew", pady=(8, 6))
+        ttk.Label(search_row, text="Search:", style="InputLabel.TLabel").pack(side="left", padx=(0, 6))
+        self.search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_row, textvariable=self.search_var, width=24)
+        search_entry.pack(side="left", fill="x", expand=True)
+        search_entry.bind("<KeyRelease>", lambda _e: self._refresh_list())
+        list_wrap = ttk.Frame(left, style="Card.TFrame")
+        list_wrap.grid(row=2, column=0, sticky="nsew", pady=(6, 6))
+        left.rowconfigure(2, weight=1)
+
+        scrollbar = ttk.Scrollbar(list_wrap, orient="vertical", style="Vertical.TScrollbar")
         self.listbox = tk.Listbox(
-            list_wrap, width=28, bg=self.colors["bg"], fg=self.colors["text"],
+            list_wrap, width=30, bg=self.colors["card"], fg=self.colors["text"],
             selectbackground=self.colors["accent"], selectforeground="white",
-            relief="flat", highlightthickness=0, borderwidth=0,
-            font=("JetBrainsMono Nerd Font", 10), yscrollcommand=scrollbar.set
+            relief="flat", highlightthickness=1, highlightcolor=self.colors["stroke"],
+            highlightbackground=self.colors["stroke"], borderwidth=0,
+            font=("JetBrainsMono Nerd Font", 12), yscrollcommand=scrollbar.set
         )
         scrollbar.config(command=self.listbox.yview)
         self.listbox.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
 
-        # Right pane: form + actions
-        right = ttk.Frame(main, style="Side.TFrame")
-        right.grid(row=0, column=1, sticky="nsew", pady=6)
-        right.columnconfigure(1, weight=1)
-        right.columnconfigure(2, weight=1)
+        self.status = ttk.Label(left, text="Select an account to enable launcher.", style="Muted.TLabel")
+        self.status.grid(row=3, column=0, sticky="w", pady=(6, 0))
 
-        ttk.Label(right, text="Account Details", style="Header.TLabel")\
+        # Right card: form + actions
+        right = ttk.Frame(content, style="Card.TFrame", padding=16)
+        right.grid(row=0, column=1, sticky="nsew", pady=6)
+        for c in (1, 2):
+            right.columnconfigure(c, weight=1)
+
+        ttk.Label(right, text="Add / Edit Account", style="Header.TLabel")\
             .grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 12))
 
-        ttk.Label(right, text="Nickname:").grid(row=1, column=0, sticky="w", padx=4, pady=6)
+        ttk.Label(right, text="Nickname:", style="InputLabel.TLabel").grid(row=1, column=0, sticky="w", padx=4, pady=6)
         self.nickname_var = tk.StringVar()
         ttk.Entry(right, textvariable=self.nickname_var, width=40).grid(row=1, column=1, columnspan=2, sticky="ew")
 
-        ttk.Label(right, text="Username:").grid(row=2, column=0, sticky="w", padx=4, pady=6)
+        ttk.Label(right, text="Username:", style="InputLabel.TLabel").grid(row=2, column=0, sticky="w", padx=4, pady=6)
         self.username_var = tk.StringVar()
         ttk.Entry(right, textvariable=self.username_var, width=40).grid(row=2, column=1, columnspan=2, sticky="ew")
 
-        ttk.Label(right, text="Password:").grid(row=3, column=0, sticky="w", padx=4, pady=6)
+        ttk.Label(right, text="Password:", style="InputLabel.TLabel").grid(row=3, column=0, sticky="w", padx=4, pady=6)
         self.password_var = tk.StringVar()
         self.password_entry = ttk.Entry(right, textvariable=self.password_var, width=40, show="*")
         self.password_entry.grid(row=3, column=1, columnspan=2, sticky="ew")
 
         self.show_pw = tk.BooleanVar(value=False)
         ttk.Checkbutton(right, text="Show password", variable=self.show_pw,
-                        command=self._toggle_pw).grid(row=4, column=1, sticky="w", pady=(0, 8))
+                        command=self._toggle_pw).grid(row=4, column=1, sticky="w", pady=(0, 10))
 
-        btns = ttk.Frame(right)
-        btns.grid(row=5, column=0, columnspan=3, pady=16, sticky="w")
-        buttons = [
-            ("Add", self.add_account, "Accent.TButton"),
-            ("Update", self.update_account, "TButton"),
-            ("Delete", self.delete_account, "TButton"),
-            ("Import DB", self.import_db, "TButton"),
-            ("Export DB", self.export_db, "TButton"),
-            ("Launch Riot Client", self.launch_riot, "Accent.TButton"),
-        ]
-        self.launch_btn = None
-        for idx, (label, cmd, style) in enumerate(buttons):
-            row_idx = idx // 3
-            col_idx = idx % 3
-            btn = ttk.Button(btns, text=label, command=cmd, style=style)
-            btn.grid(row=row_idx, column=col_idx, padx=6, pady=4, sticky="ew")
-            if label == "Launch Riot Client":
-                self.launch_btn = btn
+        self.editing_label = ttk.Label(right, text="", style="Muted.TLabel")
+        self.editing_label.grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 6))
+
+        btns = ttk.Frame(right, style="Card.TFrame")
+        btns.grid(row=6, column=0, columnspan=3, pady=10, sticky="ew")
         for c in range(3):
             btns.columnconfigure(c, weight=1)
-        if self.launch_btn:
-            self.launch_btn.state(["disabled"])
+        self.add_btn = ttk.Button(btns, text="Add", command=self.add_account, style="Accent.TButton")
+        self.add_btn.grid(row=0, column=0, padx=6, pady=4, sticky="ew")
+        self.update_btn = ttk.Button(btns, text="Update", command=self.update_account, style="TButton")
+        self.update_btn.grid(row=0, column=1, padx=6, pady=4, sticky="ew")
+        self.delete_btn = ttk.Button(btns, text="Delete", command=self.delete_account, style="Danger.TButton")
+        self.delete_btn.grid(row=0, column=2, padx=6, pady=4, sticky="ew")
 
-        self.status = ttk.Label(right, text="Select an account to enable launcher.", style="Muted.TLabel")
-        self.status.grid(row=6, column=0, columnspan=3, pady=10, sticky="w")
+        cta_row = ttk.Frame(right, style="Card.TFrame")
+        cta_row.grid(row=7, column=0, columnspan=3, pady=(6, 6), sticky="ew")
+        cta_row.columnconfigure(0, weight=1)
+        self.launch_btn = ttk.Button(cta_row, text="Launch Riot Client", command=self.launch_riot, style="Accent.TButton")
+        self.launch_btn.grid(row=0, column=0, sticky="ew", padx=6, pady=4)
+
+        db_row = ttk.Frame(right, style="Card.TFrame")
+        db_row.grid(row=8, column=0, columnspan=3, pady=(6, 4), sticky="w")
+        db_menu = ttk.Menubutton(db_row, text="Database v", style="TButton")
+        db_menu.grid(row=0, column=0, padx=6, pady=4, sticky="w")
+        db_menu.menu = tk.Menu(db_menu, tearoff=0, bg=self.colors["card"], fg=self.colors["text"])
+        db_menu["menu"] = db_menu.menu
+        db_menu.menu.add_command(label="Import DB", command=self.import_db)
+        db_menu.menu.add_command(label="Export DB", command=self.export_db)
+
+        self.toast_label = ttk.Label(right, text="", style="Status.TLabel")
+        self.toast_label.grid(row=9, column=0, columnspan=3, sticky="e", pady=(6, 0))
+
+        self._set_action_states(enabled=False)
+
+    def _set_action_states(self, enabled: bool):
+        state = ["!disabled"] if enabled else ["disabled"]
+        for btn in [getattr(self, "update_btn", None), getattr(self, "delete_btn", None), getattr(self, "launch_btn", None)]:
+            if btn:
+                btn.state(state)
+
+    def _set_status(self, message: str, duration_ms: int = 1600):
+        if self.status_after_id:
+            try:
+                self.after_cancel(self.status_after_id)
+            except Exception:
+                pass
+        self.toast_label.config(text=message)
+        self.status_after_id = self.after(duration_ms, lambda: self.toast_label.config(text=""))
 
     def _toggle_pw(self):
         self.password_entry.config(show="" if self.show_pw.get() else "*")
 
     def _refresh_list(self):
+        term = ""
+        try:
+            term = self.search_var.get().strip().lower()
+        except Exception:
+            term = ""
         self.listbox.delete(0, tk.END)
-        self.rows = self.db.all()
+        self.all_rows = self.db.all()
+        self.rows = [r for r in self.all_rows if term in r[1].lower()]
         for row in self.rows:
             self.listbox.insert(tk.END, row[1])  # nickname
+        self._set_action_states(enabled=False)
+        self.editing_label.config(text="")
 
     def on_select(self, _evt=None):
         sel = self.listbox.curselection()
         if not sel:
-            self.launch_btn.state(["disabled"])
+            self._set_action_states(enabled=False)
+            self.editing_label.config(text="")
             self.current_id = None
             return
         idx = sel[0]
@@ -256,7 +327,8 @@ class App(tk.Tk):
         self.nickname_var.set(nick)
         self.username_var.set(user)
         self.password_var.set(pw)
-        self.launch_btn.state(["!disabled"])
+        self._set_action_states(enabled=True)
+        self.editing_label.config(text=f"Editing: {nick}")
 
     # ---------- CRUD ----------
     def add_account(self):
@@ -273,8 +345,7 @@ class App(tk.Tk):
             return
         self.clear_form()
         self._refresh_list()
-
-
+        self._set_status("Added")
 
     def update_account(self):
         if not self.current_id:
@@ -292,6 +363,7 @@ class App(tk.Tk):
             messagebox.showerror("Duplicate", "Nickname already exists.")
             return
         self._refresh_list()
+        self._set_status("Updated")
 
     def delete_account(self):
         if not self.current_id:
@@ -301,7 +373,8 @@ class App(tk.Tk):
             self.db.delete(self.current_id)
             self.clear_form()
             self._refresh_list()
-            self.launch_btn.state(["disabled"])
+            self._set_status("Deleted")
+            self._set_action_states(enabled=False)
 
     def clear_form(self):
         self.nickname_var.set("")
@@ -311,6 +384,8 @@ class App(tk.Tk):
         self._toggle_pw()
         self.listbox.selection_clear(0, tk.END)
         self.current_id = None
+        self.editing_label.config(text="")
+        self._set_action_states(enabled=False)
 
     def import_db(self):
         file_path = filedialog.askopenfilename(
@@ -354,6 +429,7 @@ class App(tk.Tk):
                 self.clear_form()
                 self._refresh_list()
                 messagebox.showinfo("Import complete", f"Database overridden from:\n{file_path}")
+            self._set_status("Imported")
         except Exception as e:
             messagebox.showerror("Import failed", f"Could not import DB:\n{e}")
 
@@ -369,6 +445,7 @@ class App(tk.Tk):
         try:
             shutil.copy(DB_PATH, dest_path)
             messagebox.showinfo("Export complete", f"Database saved to:\n{dest_path}")
+            self._set_status("Exported")
         except Exception as e:
             messagebox.showerror("Export failed", f"Could not export DB:\n{e}")
 
@@ -390,6 +467,7 @@ class App(tk.Tk):
 
         # Hide main window and show mini panel
         self.withdraw()
+        self._set_status("Launched")
         self._show_copy_panel(
             self.nickname_var.get(),
             self.username_var.get(),
@@ -409,7 +487,7 @@ class App(tk.Tk):
         top.configure(bg=self.colors["panel"])
 
         container = ttk.Frame(top, style="Main.TFrame")
-        container.pack(fill="both", expand=True, padx=10, pady=10)
+        container.pack(fill="both", expand=True, padx=12, pady=12)
 
         def on_close():
             self.destroy()
@@ -426,10 +504,10 @@ class App(tk.Tk):
         # reusable row builder (copy on click)
         
         def make_row(parent, label_text, value, mask=False):
-            row = ttk.Frame(parent, style="Side.TFrame")
+            row = ttk.Frame(parent, style="Card.TFrame")
             row.pack(fill="x", padx=8, pady=4)
 
-            ttk.Label(row, text=label_text, width=10).pack(side="left")
+            ttk.Label(row, text=label_text, width=10, style="InputLabel.TLabel").pack(side="left")
 
             # Store REAL value (for copy/autofill)
             real_var = tk.StringVar(value=value)
@@ -440,10 +518,11 @@ class App(tk.Tk):
 
             ent = tk.Entry(
                 row, textvariable=display_var, width=32, state="readonly",
-                readonlybackground=self.colors["panel"],
+                readonlybackground=self.colors["card"],
                 fg=self.colors["text"], disabledforeground=self.colors["text"],
-                relief="flat", highlightthickness=0, borderwidth=0, cursor="arrow",
-                insertontime=0, insertofftime=0
+                relief="flat", highlightthickness=1, borderwidth=1, cursor="arrow",
+                insertontime=0, insertofftime=0, highlightbackground=self.colors["stroke"],
+                highlightcolor=self.colors["accent"]
             )
             ent.pack(side="left", fill="x", expand=True)
 
@@ -542,7 +621,7 @@ class App(tk.Tk):
         # store on self so inner function can call
         self.children_clip_sanitize = sanitize_text
 
-        btn_row = ttk.Frame(container, style="Side.TFrame")
+        btn_row = ttk.Frame(container, style="Card.TFrame")
         btn_row.pack(fill="x", padx=8, pady=(10, 6))
         ttk.Button(btn_row, text="Auto-fill Username + Password", command=autofocus_and_autofill)\
             .pack(side="left")
