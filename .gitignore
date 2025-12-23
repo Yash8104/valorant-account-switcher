@@ -1,6 +1,6 @@
 .venv
 build
-dist
+dist/*.exe
 account_saver_big_borderless.py
 test.py
 *.db
