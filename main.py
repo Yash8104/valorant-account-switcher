@@ -532,7 +532,7 @@ class App(tk.Tk):
             messagebox.showerror("Error", f"Riot Client not found at:\n{path}")
             return
         try:
-            subprocess.Popen([path])
+            subprocess.Popen([path, "--launch-product=valorant", "--launch-patchline=live"])
         except Exception as e:
             messagebox.showerror("Launch failed", f"Could not launch Riot Client:\n{e}")
             return
