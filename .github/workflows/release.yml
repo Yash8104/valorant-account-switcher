@@ -64,8 +64,11 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path output -Force | Out-Null
-          if (Test-Path dist) { Copy-Item -Path dist\*.exe -Destination output -Force -ErrorAction SilentlyContinue }
-          if (Test-Path installer\Output) { Copy-Item installer\Output\*.exe output\ -Force -ErrorAction SilentlyContinue }
+          if (Test-Path installer\ValorantAccountSwitcherInstaller.exe) {
+            Copy-Item installer\ValorantAccountSwitcherInstaller.exe output\ -Force
+          } elseif (Test-Path installer\Output) {
+            Copy-Item installer\Output\*.exe output\ -Force -ErrorAction SilentlyContinue
+          }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -80,5 +83,5 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
           files: |
-            output/*.exe
+            output/ValorantAccountSwitcherInstaller.exe
           prerelease: false
