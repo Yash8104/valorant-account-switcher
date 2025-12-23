@@ -81,7 +81,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
           tag_name: ${{ steps.version.outputs.version }}
-          name: ${{ steps.version.outputs.version }}
+          name: ValorantAccountSaver ${{ steps.version.outputs.version }}
           files: |
             output/ValorantAccountSwitcherInstaller.exe
           prerelease: false
