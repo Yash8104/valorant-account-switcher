@@ -4,6 +4,5 @@ dist
 account_saver_big_borderless.py
 test.py
 *.db
-*.spec
-installer/*
+installer/*.exe
 *.ico
