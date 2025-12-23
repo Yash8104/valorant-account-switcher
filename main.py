@@ -31,7 +31,7 @@ except Exception:
     _HAS_PYGETWINDOW = False
 
 DB = "simple_accounts.db"
-RIOT_PATH = r"C:\Riot Games\Riot Client\RiotClientServices.exe"  # <-- set your path
+RIOT_PATH_DEFAULT = r"C:\Riot Games\Riot Client\RiotClientServices.exe"  # fallback default path
 
 # Choose paste key per OS
 IS_MAC = sys.platform == "darwin"
@@ -39,17 +39,27 @@ PASTE_MOD = "command" if IS_MAC else "ctrl"
 APP_NAME = "ValorantAccountSwitcher"
 
 
-def get_default_db_path():
+def get_app_dir():
     # Prefer ProgramData to avoid permission issues in Program Files
     program_data = os.environ.get("PROGRAMDATA") or os.environ.get("ProgramData")
     if not program_data:
         program_data = os.path.expanduser("~")
     data_dir = os.path.join(program_data, APP_NAME)
     os.makedirs(data_dir, exist_ok=True)
+    return data_dir
+
+
+def get_default_db_path():
+    data_dir = get_app_dir()
     return os.path.join(data_dir, "simple_accounts.db")
 
 
+def get_riot_path_file():
+    return os.path.join(get_app_dir(), "riot_path.txt")
+
+
 DB_PATH = get_default_db_path()
+RIOT_PATH_FILE = get_riot_path_file()
 
 # ---------------- Data layer ----------------
 class SimpleDB:
@@ -100,6 +110,7 @@ class App(tk.Tk):
         self._set_icon(self)
         self._setup_style()
         self.db = SimpleDB()
+        self.riot_path = self._load_riot_path()
         self.current_id = None
         self.rows = []
         self.all_rows = []
@@ -252,8 +263,15 @@ class App(tk.Tk):
         self.editing_label = ttk.Label(right, text="", style="Muted.TLabel")
         self.editing_label.grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 4))
 
+        path_row = ttk.Frame(right, style="Card.TFrame")
+        path_row.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(0, 6))
+        ttk.Label(path_row, text="Riot path:", style="InputLabel.TLabel").pack(side="left", padx=(0, 6))
+        self.riot_path_label = ttk.Label(path_row, text=self._format_riot_path(), style="Muted.TLabel")
+        self.riot_path_label.pack(side="left", fill="x", expand=True)
+        ttk.Button(path_row, text="Set Path", command=self.choose_riot_path, style="TButton").pack(side="left", padx=(8, 0))
+
         btns = ttk.Frame(right, style="Card.TFrame")
-        btns.grid(row=6, column=0, columnspan=3, pady=8, sticky="ew")
+        btns.grid(row=7, column=0, columnspan=3, pady=8, sticky="ew")
         for c in range(3):
             btns.columnconfigure(c, weight=1)
         self.add_btn = ttk.Button(btns, text="Add", command=self.add_account, style="Accent.TButton")
@@ -264,13 +282,13 @@ class App(tk.Tk):
         self.delete_btn.grid(row=0, column=2, padx=6, pady=4, sticky="ew")
 
         cta_row = ttk.Frame(right, style="Card.TFrame")
-        cta_row.grid(row=7, column=0, columnspan=3, pady=(6, 6), sticky="ew")
+        cta_row.grid(row=8, column=0, columnspan=3, pady=(6, 6), sticky="ew")
         cta_row.columnconfigure(0, weight=1)
         self.launch_btn = ttk.Button(cta_row, text="Launch Riot Client", command=self.launch_riot, style="Accent.TButton")
         self.launch_btn.grid(row=0, column=0, sticky="ew", padx=6, pady=4)
 
         db_row = ttk.Frame(right, style="Card.TFrame")
-        db_row.grid(row=8, column=0, columnspan=3, pady=(6, 4), sticky="w")
+        db_row.grid(row=9, column=0, columnspan=3, pady=(6, 4), sticky="w")
         db_menu = ttk.Menubutton(db_row, text="Database v", style="TButton")
         db_menu.grid(row=0, column=0, padx=6, pady=4, sticky="w")
         db_menu.menu = tk.Menu(db_menu, tearoff=0, bg=self.colors["card"], fg=self.colors["text"])
@@ -279,7 +297,7 @@ class App(tk.Tk):
         db_menu.menu.add_command(label="Export DB", command=self.export_db)
 
         self.toast_label = ttk.Label(right, text="", style="Status.TLabel")
-        self.toast_label.grid(row=9, column=0, columnspan=3, sticky="e", pady=(6, 0))
+        self.toast_label.grid(row=10, column=0, columnspan=3, sticky="e", pady=(6, 0))
 
         self._set_action_states(enabled=False)
 
@@ -297,6 +315,56 @@ class App(tk.Tk):
                 pass
         self.toast_label.config(text=message)
         self.status_after_id = self.after(duration_ms, lambda: self.toast_label.config(text=""))
+
+    def _load_riot_path(self) -> str:
+        try:
+            if os.path.exists(RIOT_PATH_FILE):
+                return open(RIOT_PATH_FILE, "r", encoding="utf-8").read().strip() or RIOT_PATH_DEFAULT
+        except Exception:
+            pass
+        return RIOT_PATH_DEFAULT
+
+    def _save_riot_path(self, path: str):
+        try:
+            with open(RIOT_PATH_FILE, "w", encoding="utf-8") as f:
+                f.write(path)
+        except Exception:
+            pass
+
+    def _format_riot_path(self) -> str:
+        if not self.riot_path:
+            return "Not set"
+        if len(self.riot_path) > 48:
+            return f"...{self.riot_path[-45:]}"
+        return self.riot_path
+
+    def choose_riot_path(self):
+        selected = filedialog.askopenfilename(
+            title="Select RiotClientServices.exe",
+            filetypes=[("Executable", "*.exe"), ("All files", "*.*")]
+        )
+        if not selected:
+            return
+        self.riot_path = selected
+        self._save_riot_path(selected)
+        self.riot_path_label.config(text=self._format_riot_path())
+        self._set_status("Path saved")
+
+    def _ensure_riot_path(self) -> str:
+        if self.riot_path and os.path.exists(self.riot_path):
+            return self.riot_path
+        # Try to prompt user
+        selected = filedialog.askopenfilename(
+            title="Locate RiotClientServices.exe",
+            filetypes=[("Executable", "*.exe"), ("All files", "*.*")]
+        )
+        if not selected:
+            messagebox.showerror("Path needed", "Please select RiotClientServices.exe.")
+            return ""
+        self.riot_path = selected
+        self._save_riot_path(selected)
+        self.riot_path_label.config(text=self._format_riot_path())
+        return selected
 
     def _toggle_pw(self):
         self.password_entry.config(show="" if self.show_pw.get() else "*")
@@ -457,11 +525,14 @@ class App(tk.Tk):
             return
 
         # Launch Riot (optional)
-        if not os.path.exists(RIOT_PATH):
-            messagebox.showerror("Error", f"Riot Client not found at:\n{RIOT_PATH}")
+        path = self._ensure_riot_path()
+        if not path:
+            return
+        if not os.path.exists(path):
+            messagebox.showerror("Error", f"Riot Client not found at:\n{path}")
             return
         try:
-            subprocess.Popen([RIOT_PATH])
+            subprocess.Popen([path])
         except Exception as e:
             messagebox.showerror("Launch failed", f"Could not launch Riot Client:\n{e}")
             return
