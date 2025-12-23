@@ -105,7 +105,8 @@ class App(tk.Tk):
         # Keep the standard Windows title bar instead of a custom header
         self.overrideredirect(False)
         self.title("Simple Account Saver + Riot Launcher")
-        self.geometry("780x530")
+        self.geometry("900x530")
+        self.minsize(900, 530)
         self.icon_image = None
         self._set_icon(self)
         self._setup_style()
