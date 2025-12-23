@@ -35,6 +35,8 @@ jobs:
           python -m pip install --upgrade pip
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
           pip install pyinstaller
+          # Ensure pyautogui stack is present even if requirements change
+          pip install pyautogui pygetwindow pyscreeze pymsgbox pytweening mouseinfo pyperclip pydirectinput pyrect
 
       - name: Build executable from spec
         shell: pwsh
