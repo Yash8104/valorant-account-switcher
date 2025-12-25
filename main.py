@@ -60,6 +60,7 @@ def get_riot_path_file():
 
 DB_PATH = get_default_db_path()
 RIOT_PATH_FILE = get_riot_path_file()
+LAST_ACCOUNT_FILE = os.path.join(get_app_dir(), "last_account.txt")
 
 # ---------------- Data layer ----------------
 class SimpleDB:
@@ -116,9 +117,11 @@ class App(tk.Tk):
         self.rows = []
         self.all_rows = []
         self.status_after_id = None
+        self.last_account_id = self._load_last_account()
 
         self._build_ui()
         self._refresh_list()
+        self.bind("<Return>", lambda _e: self.launch_riot())
 
     def _set_icon(self, window):
         try:
@@ -317,6 +320,23 @@ class App(tk.Tk):
         self.toast_label.config(text=message)
         self.status_after_id = self.after(duration_ms, lambda: self.toast_label.config(text=""))
 
+    def _load_last_account(self) -> int | None:
+        try:
+            if os.path.exists(LAST_ACCOUNT_FILE):
+                return int(open(LAST_ACCOUNT_FILE, "r", encoding="utf-8").read().strip())
+        except Exception:
+            return None
+        return None
+
+    def _save_last_account(self, account_id: int | None):
+        if not account_id:
+            return
+        try:
+            with open(LAST_ACCOUNT_FILE, "w", encoding="utf-8") as f:
+                f.write(str(account_id))
+        except Exception:
+            pass
+
     def _load_riot_path(self) -> str:
         try:
             if os.path.exists(RIOT_PATH_FILE):
@@ -381,8 +401,20 @@ class App(tk.Tk):
         self.rows = [r for r in self.all_rows if term in r[1].lower()]
         for row in self.rows:
             self.listbox.insert(tk.END, row[1])  # nickname
-        self._set_action_states(enabled=False)
-        self.editing_label.config(text="")
+        # Auto-select last used account if available
+        if self.last_account_id:
+            for idx, row in enumerate(self.rows):
+                if row[0] == self.last_account_id:
+                    self.listbox.selection_set(idx)
+                    self.listbox.see(idx)
+                    self.on_select()
+                    break
+            else:
+                self._set_action_states(enabled=False)
+                self.editing_label.config(text="")
+        else:
+            self._set_action_states(enabled=False)
+            self.editing_label.config(text="")
 
     def on_select(self, _evt=None):
         sel = self.listbox.curselection()
@@ -541,6 +573,7 @@ class App(tk.Tk):
         # Hide main window and show mini panel
         self.withdraw()
         self._set_status("Launched")
+        self._save_last_account(self.current_id)
         self._show_copy_panel(
             self.nickname_var.get(),
             self.username_var.get(),
